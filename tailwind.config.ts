@@ -65,6 +65,8 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        'whatsapp-green': '#4CAF50', // Added WhatsApp green
+        'whatsapp-bg': '#F0F5F1', // Added WhatsApp background color from proposal
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -88,10 +90,15 @@ export default {
             height: '0',
           },
         },
+        typingDotsBounce: {
+          '0%, 80%, 100%': { transform: 'scale(0)' },
+          '40%': { transform: 'scale(1.0)' },
+        }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'typing-dots-bounce': 'typingDotsBounce 1.4s infinite ease-in-out both',
       },
     },
   },

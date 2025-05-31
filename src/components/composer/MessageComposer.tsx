@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { XCircle, Edit3, Trash2, PlusCircle, FileUp } from "lucide-react";
+import NextImage from "next/image"; // Use NextImage for consistency
 
 interface MessageComposerProps {
   queue: MessageQueueItem[];
@@ -33,13 +34,11 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    if (name === "content" && formData.type !== "text") { // URL input for media
-      // If user types in URL, it takes precedence over any uploaded file for this draft
+    if (name === "content" && formData.type !== "text") { 
       setFormData(prev => ({
         ...prev,
         content: value, 
       }));
-      // No need to clear fileInputRef.current.value here, as data URI in formData.content is what matters
     } else {
       setFormData(prev => ({ 
         ...prev, 
@@ -57,13 +56,11 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
       reader.onloadend = () => {
         setFormData(prev => ({
           ...prev,
-          content: reader.result as string, // This will be a data URI
+          content: reader.result as string, 
         }));
       };
       reader.readAsDataURL(file);
     } else {
-      // If file selection is cancelled, and content was a data URI, clear it
-      // This allows URL input to become active again.
       setFormData(prev => ({
         ...prev,
         content: prev.content.startsWith("data:") ? "" : prev.content,
@@ -72,29 +69,23 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
   };
 
   const handleSelectChange = (name: "sender" | "type") => (value: string) => {
-    const newType = value as MessageType; // if name is 'type', otherwise it's MessageSender
+    const newType = value as MessageType;
     
     setFormData(prev => {
-      const oldType = prev.type;
       let newContent = prev.content;
 
-      // If current content is an uploaded file (data URI) and type is changing, clear it.
       if (name === 'type' && prev.content.startsWith("data:")) {
         newContent = "";
         if (fileInputRef.current) {
-          fileInputRef.current.value = ""; // Reset file input field
+          fileInputRef.current.value = ""; 
         }
       }
-      // If switching from text to media, and content was text (not a URL), clear it.
-      // This might be too aggressive if user typed a URL then switched type.
-      // For simplicity, we'll only clear data URIs on type change for now.
-      // URLs will persist.
-
+      
       const activeType = name === 'type' ? newType : prev.type;
 
       return {
         ...prev,
-        [name]: value, // Updates either 'sender' or 'type'
+        [name]: value, 
         content: newContent,
         audioDuration: activeType === "audio" ? prev.audioDuration || 2000 : undefined,
         videoDuration: activeType === "video" ? prev.videoDuration || 5000 : undefined,
@@ -104,6 +95,13 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    if (!formData.content && (formData.type !== 'text')) {
+        // Basic validation: if not text, content (URL or data URI) must exist
+        // You might want to add more specific error handling/toast messages here
+        console.warn(`Content is required for message type: ${formData.type}`);
+        return; 
+    }
+
     if (editingId) {
       setQueue(queue.map(item => item.id === editingId ? { ...formData, id: editingId } : item));
     } else {
@@ -119,12 +117,12 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
       type: messageToEdit.type,
       content: messageToEdit.content,
       delayAfter: messageToEdit.delayAfter,
-      audioDuration: messageToEdit.type === "audio" ? messageToEdit.audioDuration : undefined,
-      videoDuration: messageToEdit.type === "video" ? messageToEdit.videoDuration : undefined,
+      audioDuration: messageToEdit.audioDuration, // Keep existing duration if available
+      videoDuration: messageToEdit.videoDuration, // Keep existing duration if available
     });
     setEditingId(messageToEdit.id);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // Clear file input when starting an edit
+      fileInputRef.current.value = ""; 
     }
   };
 
@@ -204,7 +202,7 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
                 <Input 
                   id="content-url" 
                   name="content" 
-                  value={isMediaUploaded ? '' : formData.content}
+                  value={isMediaUploaded ? "Using uploaded file" : formData.content} // Show placeholder text if uploaded
                   onChange={handleInputChange} 
                   placeholder={`Enter ${formData.type} URL...`} 
                   disabled={isMediaUploaded}
@@ -223,18 +221,18 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
                     formData.type === "video" ? "video/*" :
                     formData.type === "image" ? "image/*" :
                     formData.type === "gif" ? "image/gif" :
-                    formData.type === "sticker" ? "image/*" : // Stickers are often images (png, webp)
+                    formData.type === "sticker" ? "image/*" : 
                     undefined
                   }
                   onChange={handleFileChange}
-                  className="hidden" // Styled by the label
+                  className="hidden" 
                   disabled={isMediaUploaded}
                 />
 
-                {isMediaUploaded && (
+                {isMediaUploaded && formData.content && (
                   <div className="mt-2 p-2 border rounded-md space-y-2">
                     <Label className="text-xs font-medium">Uploaded File Preview:</Label>
-                    {formData.type.match(/^(image|gif|sticker)$/) && <Image src={formData.content} alt="Preview" width={150} height={100} className="max-w-full h-auto rounded border object-contain" />}
+                    {formData.type.match(/^(image|gif|sticker)$/) && <NextImage src={formData.content} alt="Preview" width={150} height={100} className="max-w-full h-auto rounded border object-contain" data-ai-hint="media preview"/>}
                     {formData.type === 'video' && <video src={formData.content} controls className="max-w-full h-auto max-h-32 rounded border" />}
                     {formData.type === 'audio' && <audio src={formData.content} controls className="w-full" />}
                     <Button variant="outline" size="sm" onClick={clearUploadedFile} className="w-full mt-1">
@@ -307,8 +305,8 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
                         </p>
                         <div className="text-xs text-muted-foreground mt-1">
                           <span>Delay: {item.delayAfter}ms</span>
-                          {item.type === 'audio' && item.audioDuration && <span> / Duration: {item.audioDuration}ms</span>}
-                          {item.type === 'video' && item.videoDuration && <span> / Duration: {item.videoDuration}ms</span>}
+                          {item.type === 'audio' && typeof item.audioDuration === 'number' && <span> / Duration: {item.audioDuration}ms</span>}
+                          {item.type === 'video' && typeof item.videoDuration === 'number' && <span> / Duration: {item.videoDuration}ms</span>}
                         </div>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2 ml-2">
@@ -330,14 +328,3 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
     </Card>
   );
 }
-
-// Helper component for Image to avoid direct next/image in CDATA if problematic
-// For simplicity, direct <img> used for data URIs or basic <audio>/<video>
-const Image = ({ src, alt, width, height, className }: { src: string, alt: string, width?: number, height?: number, className?: string }) => {
-  // In a real scenario, you might want to use next/image if URLs are external and need optimization
-  // For data URIs, <img> is fine.
-  if (width && height) {
-    return <img src={src} alt={alt} width={width} height={height} className={className} style={{objectFit: 'contain'}} />;
-  }
-  return <img src={src} alt={alt} className={className} style={{maxWidth: '100%', height: 'auto', objectFit: 'contain'}} />;
-};

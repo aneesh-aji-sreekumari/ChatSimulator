@@ -15,6 +15,7 @@ export interface Message {
 }
 
 export interface MessageQueueItem {
+  id: string; // Added for composer management
   sender: MessageSender;
   type: MessageType;
   content: string;

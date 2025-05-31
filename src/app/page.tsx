@@ -7,6 +7,7 @@ import { messageQueue as defaultMessageQueue } from "@/lib/sample-chat-data";
 import ChatHeader from "@/components/chat/ChatHeader";
 import ChatWindow from "@/components/chat/ChatWindow";
 import KeypadArea from "@/components/chat/KeypadArea";
+import MessageComposer from "@/components/composer/MessageComposer";
 import { Button } from "@/components/ui/button";
 import { PlayCircle } from "lucide-react";
 
@@ -24,6 +25,12 @@ export default function ChatterSimPage() {
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [showKeypadInputArea, setShowKeypadInputArea] = useState(false); 
   const [showSendButton, setShowSendButton] = useState(false);
+  const [customMessageQueue, setCustomMessageQueue] = useState<MessageQueueItem[]>(() => {
+    // Ensure defaultMessageQueue items have IDs if they are to be editable by composer
+    // This is now handled in sample-chat-data.ts
+    return JSON.parse(JSON.stringify(defaultMessageQueue)); // Deep copy
+  });
+
 
   const audioCompletionPromises = useRef<Record<string, () => void>>({});
   const videoCompletionPromises = useRef<Record<string, () => void>>({});
@@ -57,6 +64,12 @@ export default function ChatterSimPage() {
 
 
   const simulateChat = async (queue: MessageQueueItem[]) => {
+    if (!queue || queue.length === 0) {
+      console.warn("Message queue is empty. Nothing to simulate.");
+      // Optionally, show a toast or message to the user
+      // For now, just return
+      return;
+    }
     setIsSimulating(true);
     setShowKeypadInputArea(false);
     setCurrentTypingText("");
@@ -97,14 +110,20 @@ export default function ChatterSimPage() {
           setShowSendButton(false);
           
           if (item.content) {
-             // Simulate recording by playing the audio
             const audio = new Audio(item.content);
-            await new Promise<void>((resolve) => {
-              audio.oncanplaythrough = () => audio.play().catch(err => { console.error("Error playing recording sim audio:", err); resolve(); });
+            const playbackPromise = new Promise<void>((resolve, reject) => {
+              audio.oncanplaythrough = () => audio.play().catch(err => { console.error("Error playing recording sim audio:", err); reject(err); });
               audio.onended = resolve;
-              audio.onerror = (e) => { console.error("Error during recording sim audio playback:", e); resolve(); };
-              audio.load();
+              audio.onerror = (e) => { console.error("Error during recording sim audio playback:", e); reject(e); };
+              audio.load(); 
             });
+             try {
+                await playbackPromise;
+             } catch (error) {
+                console.error("Failed to play audio during 'me' sending simulation:", error);
+                // Fallback to duration if playback fails
+                await delay(item.audioDuration || 2000);
+             }
           } else {
             await delay(item.audioDuration || 2000);
           }
@@ -117,16 +136,15 @@ export default function ChatterSimPage() {
             ticks: "sent"
           });
         } else if (item.type === "image" || item.type === "gif" || item.type === "sticker" || item.type === "video") {
-          // For other media types, simulate selection and send
-          setCurrentTypingText(`Sending ${item.type}...`); // Optional: show some text
-          setShowSendButton(true); // Or an attach icon
-          await delay(700); // Simulate user selecting media
+          setCurrentTypingText(`Sending ${item.type}...`);
+          setShowSendButton(true); 
+          await delay(700); 
 
           sentMessageId = addMessage({
             sender: "me",
             type: item.type,
             content: item.content,
-            videoDuration: item.videoDuration,
+            videoDuration: item.videoDuration, // only relevant for video type
             ticks: "sent"
           });
           setCurrentTypingText("");
@@ -152,30 +170,42 @@ export default function ChatterSimPage() {
           await delay(Math.max(readingTimeMs, 1000)); 
 
         } else if (item.type === "audio") {
-          const audioMessageId = addMessage({
-            sender: "friend",
-            type: "audio",
-            content: item.content,
-            isPlaying: true, 
-            audioDuration: item.audioDuration 
-          });
-          await new Promise<void>(resolve => {
-             audioCompletionPromises.current[audioMessageId] = resolve;
-          });
+           if (!item.content) {
+            console.warn("Friend's audio message has no content. Skipping playback wait.");
+            addMessage({ sender: "friend", type: "audio", content: "", isPlaying: false, audioDuration: item.audioDuration });
+            await delay(item.audioDuration || 1000); // Fallback delay
+          } else {
+            const audioMessageId = addMessage({
+              sender: "friend",
+              type: "audio",
+              content: item.content,
+              isPlaying: true, 
+              audioDuration: item.audioDuration 
+            });
+            await new Promise<void>(resolve => {
+               audioCompletionPromises.current[audioMessageId] = resolve;
+            });
+          }
         } else if (item.type === "video") {
-          const videoMessageId = addMessage({
-            sender: "friend",
-            type: "video",
-            content: item.content,
-            isVideoPlaying: true,
-            videoDuration: item.videoDuration
-          });
-           await new Promise<void>(resolve => {
-             videoCompletionPromises.current[videoMessageId] = resolve;
-          });
+          if (!item.content) {
+             console.warn("Friend's video message has no content. Skipping playback wait.");
+             addMessage({ sender: "friend", type: "video", content: "", isVideoPlaying: false, videoDuration: item.videoDuration });
+             await delay(item.videoDuration || 2000); // Fallback delay
+          } else {
+            const videoMessageId = addMessage({
+              sender: "friend",
+              type: "video",
+              content: item.content,
+              isVideoPlaying: true,
+              videoDuration: item.videoDuration
+            });
+             await new Promise<void>(resolve => {
+               videoCompletionPromises.current[videoMessageId] = resolve;
+            });
+          }
         } else if (item.type === "image" || item.type === "gif" || item.type === "sticker") {
            addMessage({ sender: "friend", type: item.type, content: item.content });
-           await delay(1500); // Generic delay for viewing image/gif/sticker
+           await delay(1500); 
         }
       }
       await delay(item.delayAfter);
@@ -186,33 +216,39 @@ export default function ChatterSimPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-200 dark:bg-slate-800">
-      <div className="w-full max-w-sm h-[calc(100vh-2rem)] sm:h-[calc(100vh-4rem)] max-h-[800px] bg-background flex flex-col shadow-2xl rounded-xl overflow-hidden border-4 border-slate-700 dark:border-slate-600">
-        <ChatHeader name="Alice" avatarUrl="https://placehold.co/80x80.png" isOnline={isSimulating || showFriendTypingIndicator} />
-        <ChatWindow 
-          messages={messages} 
-          showTypingIndicator={showFriendTypingIndicator} 
-          onAudioPlaybackEnd={handleAudioPlaybackEnd}
-          onVideoPlaybackEnd={handleVideoPlaybackEnd} 
-        />
-        {(showKeypadInputArea || isRecordingAudio) && (
-          <KeypadArea
-            isSimulating={isSimulating && (currentTypingText !== "" || isRecordingAudio)}
-            isRecordingAudio={isRecordingAudio}
-            typedText={currentTypingText}
-            showSendButton={showSendButton}
+    <div className="flex flex-col md:flex-row min-h-screen bg-slate-200 dark:bg-slate-800 p-4 gap-4">
+      <div className="md:w-1/3 lg:w-1/4 h-full md:max-h-[calc(100vh-2rem)]">
+        <MessageComposer queue={customMessageQueue} setQueue={setCustomMessageQueue} />
+      </div>
+      
+      <div className="md:w-2/3 lg:w-3/4 flex flex-col items-center justify-center">
+        <div className="w-full max-w-sm h-[calc(100vh-2rem-env(safe-area-inset-bottom))] sm:h-[calc(100vh-4rem-env(safe-area-inset-bottom))] max-h-[800px] bg-background flex flex-col shadow-2xl rounded-xl overflow-hidden border-4 border-slate-700 dark:border-slate-600">
+          <ChatHeader name="Alice" avatarUrl="https://placehold.co/80x80.png" isOnline={isSimulating || showFriendTypingIndicator} />
+          <ChatWindow 
+            messages={messages} 
+            showTypingIndicator={showFriendTypingIndicator} 
+            onAudioPlaybackEnd={handleAudioPlaybackEnd}
+            onVideoPlaybackEnd={handleVideoPlaybackEnd} 
           />
-        )}
-        <div className="p-4 border-t bg-background">
-          <Button
-            onClick={() => simulateChat(defaultMessageQueue)}
-            disabled={isSimulating}
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-            aria-label="Start chat simulation"
-          >
-            <PlayCircle className="mr-2 h-5 w-5" />
-            {isSimulating ? "Simulating..." : "Simulate Chat"}
-          </Button>
+          {(showKeypadInputArea || isRecordingAudio) && (
+            <KeypadArea
+              isSimulating={isSimulating && (currentTypingText !== "" || isRecordingAudio)}
+              isRecordingAudio={isRecordingAudio}
+              typedText={currentTypingText}
+              showSendButton={showSendButton}
+            />
+          )}
+          <div className="p-4 border-t bg-background">
+            <Button
+              onClick={() => simulateChat(customMessageQueue)}
+              disabled={isSimulating || customMessageQueue.length === 0}
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+              aria-label="Start chat simulation"
+            >
+              <PlayCircle className="mr-2 h-5 w-5" />
+              {isSimulating ? "Simulating..." : "Simulate Chat"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

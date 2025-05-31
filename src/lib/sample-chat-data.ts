@@ -12,36 +12,42 @@ const sampleVideo = "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Bi
 
 export const messageQueue: MessageQueueItem[] = [
   {
+    id: "1",
     sender: "me",
     type: "text",
     content: "Hey! How's it going?",
     delayAfter: 1000,
   },
   {
+    id: "2",
     sender: "friend",
     type: "text",
     content: "Pretty good! Just chilling. You?",
     delayAfter: 1500,
   },
   {
+    id: "3",
     sender: "me",
     type: "text",
     content: "Same here. Working on a new project.",
     delayAfter: 1200,
   },
   {
+    id: "4",
     sender: "friend",
     type: "image",
     content: sampleImage,
     delayAfter: 2000,
   },
   {
+    id: "5",
     sender: "me",
     type: "text",
     content: "Nice pic!",
     delayAfter: 1000,
   },
   {
+    id: "6",
     sender: "friend",
     type: "audio",
     content: sampleAudioFriend,
@@ -49,24 +55,28 @@ export const messageQueue: MessageQueueItem[] = [
     delayAfter: 1000,
   },
   {
+    id: "7",
     sender: "me",
     type: "sticker",
     content: sampleSticker,
     delayAfter: 1500,
   },
   {
+    id: "8",
     sender: "friend",
     type: "gif",
     content: sampleGif, // Will be displayed as an image
     delayAfter: 2000,
   },
   {
+    id: "9",
     sender: "me",
     type: "text",
     content: "Haha, cool GIF!",
     delayAfter: 1000,
   },
   {
+    id: "10",
     sender: "friend",
     type: "video",
     content: sampleVideo,
@@ -74,12 +84,14 @@ export const messageQueue: MessageQueueItem[] = [
     delayAfter: 1000,
   },
   {
+    id: "11",
     sender: "me",
     type: "text",
     content: "Wow, a video!",
     delayAfter: 1200,
   },
   {
+    id: "12",
     sender: "me",
     type: "audio",
     content: sampleAudioMe,
@@ -87,6 +99,7 @@ export const messageQueue: MessageQueueItem[] = [
     delayAfter: 1000,
   },
   {
+    id: "13",
     sender: "friend",
     type: "text",
     content: "Yep! This simulator is getting fancy.",

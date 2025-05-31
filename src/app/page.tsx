@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -46,7 +47,7 @@ export default function ChatterSimPage() {
 
   const simulateChat = async (queue: MessageQueueItem[]) => {
     setIsSimulating(true);
-    setShowKeypadInputArea(false); 
+    setShowKeypadInputArea(false);
     setCurrentTypingText("");
     setIsRecordingAudio(false);
     setShowFriendTypingIndicator(false);
@@ -67,17 +68,17 @@ export default function ChatterSimPage() {
           }
           setShowSendButton(true);
           await delay(500); // Pause before "send"
-          
+
           const sentMessageId = Date.now().toString() + Math.random();
           setMessages(prev => [
             ...prev,
-            { 
-              id: sentMessageId, 
-              sender: "me", 
-              type: "text", 
-              content: item.content, 
-              timestamp: new Date(), 
-              ticks: "sent" 
+            {
+              id: sentMessageId,
+              sender: "me",
+              type: "text",
+              content: item.content,
+              timestamp: new Date(),
+              ticks: "sent"
             },
           ]);
           setCurrentTypingText("");
@@ -99,16 +100,16 @@ export default function ChatterSimPage() {
             audioDuration: item.audioDuration,
           });
         }
-        setShowKeypadInputArea(false); 
+        setShowKeypadInputArea(false);
 
       } else { // sender is "friend"
-        setShowKeypadInputArea(false); 
+        setShowKeypadInputArea(false);
         if (item.type === "text") {
           setShowFriendTypingIndicator(true);
           await delay(FRIEND_TYPING_INDICATOR_DURATION_MS);
           setShowFriendTypingIndicator(false);
           addMessage({ sender: "friend", type: "text", content: item.content });
-          
+
           const wordCount = item.content.split(/\s+/).length;
           const readingTimeMs = (wordCount / READING_WORDS_PER_MINUTE) * 60 * 1000;
           await delay(Math.max(readingTimeMs, 1000)); // Minimum 1s reading time
@@ -117,36 +118,24 @@ export default function ChatterSimPage() {
           const audioMessageId = Date.now().toString() + Math.random();
           setMessages(prev => [
             ...prev,
-            { 
-              id: audioMessageId, 
-              sender: "friend", 
-              type: "audio", 
-              content: item.content, 
-              timestamp: new Date(), 
-              isPlaying: true,
-              audioDuration: item.audioDuration
+            {
+              id: audioMessageId,
+              sender: "friend",
+              type: "audio",
+              content: item.content,
+              timestamp: new Date(),
+              isPlaying: true, // This will trigger autoPlay in AudioPlayer
+              audioDuration: item.audioDuration // For UI hints
             },
           ]);
-          
-          // Wait for audio to finish
-          // For actual audio duration, this would involve getting duration from the <audio> element
-          // and awaiting its 'ended' event.
-          // For simulation with known duration:
-          if (item.audioDuration) {
-            await new Promise<void>(resolve => {
-              audioCompletionPromises.current[audioMessageId] = resolve;
-              // Fallback timeout if onPlaybackEnd isn't called (e.g., audio error)
-              // This is a simplified wait; a more robust solution would involve the AudioPlayer component.
-              setTimeout(() => {
-                if (audioCompletionPromises.current[audioMessageId]) {
-                  resolve(); // Resolve if not already resolved by onPlaybackEnd
-                  delete audioCompletionPromises.current[audioMessageId];
-                }
-              }, item.audioDuration + 500); // Wait for duration + buffer
-            });
-          } else {
-            await delay(3000); // Default wait if duration unknown
-          }
+
+          // Wait for the audio to actually finish playing.
+          // The promise is resolved by handleAudioPlaybackEnd when the AudioPlayer's 'ended' event fires.
+          await new Promise<void>(resolve => {
+            audioCompletionPromises.current[audioMessageId] = resolve;
+            // The promise will resolve when handleAudioPlaybackEnd is called.
+            // No explicit timeout based on item.audioDuration here.
+          });
         }
       }
       await delay(item.delayAfter);
@@ -170,8 +159,8 @@ export default function ChatterSimPage() {
           />
         )}
         <div className="p-4 border-t bg-background">
-          <Button 
-            onClick={() => simulateChat(defaultMessageQueue)} 
+          <Button
+            onClick={() => simulateChat(defaultMessageQueue)}
             disabled={isSimulating}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
             aria-label="Start chat simulation"

@@ -95,11 +95,20 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!formData.content && (formData.type !== 'text')) {
-        // Basic validation: if not text, content (URL or data URI) must exist
-        // You might want to add more specific error handling/toast messages here
-        console.warn(`Content is required for message type: ${formData.type}`);
-        return; 
+    if (!formData.content && (formData.type !== 'text' && !formData.audioDuration && !formData.videoDuration )) {
+        // Basic validation: if not text, content (URL or data URI) must exist, or if it's pure audio/video, duration must be set
+        if (formData.type === 'audio' && !formData.audioDuration && !formData.content) {
+          console.warn(`Content or duration is required for audio message type`);
+          return;
+        }
+        if (formData.type === 'video' && !formData.videoDuration && !formData.content) {
+          console.warn(`Content or duration is required for video message type`);
+          return;
+        }
+        if (formData.type !== 'text' && formData.type !== 'audio' && formData.type !== 'video' && !formData.content) {
+          console.warn(`Content is required for message type: ${formData.type}`);
+          return;
+        }
     }
 
     if (editingId) {
@@ -117,8 +126,8 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
       type: messageToEdit.type,
       content: messageToEdit.content,
       delayAfter: messageToEdit.delayAfter,
-      audioDuration: messageToEdit.audioDuration, // Keep existing duration if available
-      videoDuration: messageToEdit.videoDuration, // Keep existing duration if available
+      audioDuration: messageToEdit.audioDuration,
+      videoDuration: messageToEdit.videoDuration,
     });
     setEditingId(messageToEdit.id);
     if (fileInputRef.current) {
@@ -202,7 +211,7 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
                 <Input 
                   id="content-url" 
                   name="content" 
-                  value={isMediaUploaded ? "Using uploaded file" : formData.content} // Show placeholder text if uploaded
+                  value={isMediaUploaded ? "Using uploaded file" : formData.content} 
                   onChange={handleInputChange} 
                   placeholder={`Enter ${formData.type} URL...`} 
                   disabled={isMediaUploaded}
@@ -292,15 +301,15 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
               <div className="p-4 space-y-3">
                 {queue.map((item) => (
                   <Card key={item.id} className="p-3 bg-card/50">
-                    <div className="flex justify-between items-start">
-                      <div>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">
                           <span className={`capitalize px-2 py-0.5 rounded-full text-xs mr-2 ${item.sender === 'me' ? 'bg-accent text-accent-foreground' : 'bg-primary text-primary-foreground'}`}>
                             {item.sender}
                           </span>
                           <span className="capitalize text-muted-foreground">({item.type})</span>
                         </p>
-                        <p className="text-sm mt-1 break-all max-w-[180px] sm:max-w-[230px] md:max-w-[180px] lg:max-w-[230px] xl:max-w-xs truncate" title={item.content.startsWith("data:") ? "[Uploaded File]" : item.content}>
+                        <p className="text-sm mt-1 break-all truncate" title={item.content.startsWith("data:") ? "[Uploaded File]" : item.content}>
                           {item.content.startsWith("data:") ? `[Uploaded ${item.type}]` : item.content}
                         </p>
                         <div className="text-xs text-muted-foreground mt-1">
@@ -309,7 +318,7 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
                           {item.type === 'video' && typeof item.videoDuration === 'number' && <span> / Duration: {item.videoDuration}ms</span>}
                         </div>
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2 ml-2">
+                      <div className="flex flex-col sm:flex-row gap-1 flex-shrink-0">
                         <Button variant="outline" size="iconSm" onClick={() => handleEdit(item)} aria-label="Edit message">
                           <Edit3 size={14} />
                         </Button>
@@ -328,3 +337,4 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
     </Card>
   );
 }
+

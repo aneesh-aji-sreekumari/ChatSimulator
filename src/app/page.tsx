@@ -22,6 +22,14 @@ const READING_WORDS_PER_MINUTE = 200;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Sound effect file paths (assuming they are in public/sounds/)
+const SOUND_MY_MESSAGE_SENT = "/sounds/my_message_sent.mp3";
+const SOUND_FRIEND_MESSAGE_RECEIVED = "/sounds/friend_message_received.mp3";
+const SOUND_FRIEND_TYPING = "/sounds/friend_typing.mp3";
+const SOUND_MY_AUDIO_RECORD_START = "/sounds/my_audio_record_start.mp3";
+const SOUND_MY_AUDIO_SENT = "/sounds/my_audio_sent.mp3";
+
+
 export default function ChatterSimPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -40,6 +48,15 @@ export default function ChatterSimPage() {
 
   const audioCompletionPromises = useRef<Record<string, () => void>>({});
   const videoCompletionPromises = useRef<Record<string, () => void>>({});
+
+  const playSound = (soundUrl: string) => {
+    try {
+      const audio = new Audio(soundUrl);
+      audio.play().catch(error => console.warn(`Failed to play sound ${soundUrl}:`, error));
+    } catch (error) {
+      console.warn(`Error creating audio for ${soundUrl}:`, error);
+    }
+  };
 
 
   const addMessage = (newMessageOmitIdTimestamp: Omit<Message, "id" | "timestamp">) => {
@@ -80,7 +97,7 @@ export default function ChatterSimPage() {
   };
 
   const clearUploadedAvatar = () => {
-    setFriendAvatarUrl("https://placehold.co/80x80.png"); 
+    setFriendAvatarUrl("https://placehold.co/80x80.png");
     if (avatarFileInputRef.current) {
       avatarFileInputRef.current.value = "";
     }
@@ -125,51 +142,54 @@ export default function ChatterSimPage() {
             content: item.content,
             ticks: "sent"
           });
+          playSound(SOUND_MY_MESSAGE_SENT);
           setCurrentTypingText("");
           setShowSendButton(false);
 
         } else if (item.type === "audio") {
+          playSound(SOUND_MY_AUDIO_RECORD_START);
           setIsRecordingAudio(true);
-          setCurrentTypingText("");
-          setShowSendButton(false);
+          setCurrentTypingText(""); // Clear any "Sending..." text
+          setShowSendButton(false); // Hide send button during recording sim
 
-          if (item.content) {
+          if (item.content) { // If there's an audio file to play for simulation
             const audio = new Audio(item.content);
             const playbackPromise = new Promise<void>((resolve, reject) => {
-                audio.oncanplaythrough = () => audio.play().catch(err => {
-                    console.error("Error playing recording sim audio:", err);
-                    // Attempt to resolve anyway to not block simulation, or reject if critical
-                    resolve(); // Or reject(err) if this failure should stop the simulation
-                });
-                audio.onended = resolve;
-                audio.onerror = (e) => {
-                    console.error("Error during recording sim audio playback:", e);
-                    // Attempt to resolve anyway
-                    resolve(); // Or reject(e)
-                };
-                audio.load(); // Ensure audio loads
+              audio.oncanplaythrough = () => audio.play().catch(err => {
+                console.error("Error playing recording sim audio:", err);
+                resolve(); // Resolve anyway to not block simulation
+              });
+              audio.onended = resolve;
+              audio.onerror = (e) => {
+                console.error("Error during recording sim audio playback:", e);
+                resolve(); // Resolve anyway
+              };
+              audio.load();
             });
             try {
-                await playbackPromise;
+              await playbackPromise;
             } catch (error) {
                 console.error("Failed to play audio during 'me' sending simulation, falling back to duration:", error);
                 await delay(item.audioDuration || 2000);
             }
-          } else {
+          } else { // Fallback to duration if no content for playback
             await delay(item.audioDuration || 2000);
           }
+
           setIsRecordingAudio(false);
           sentMessageId = addMessage({
             sender: "me",
             type: "audio",
-            content: item.content,
+            content: item.content, // This could be a real URL or a placeholder if no actual recording happens
             audioDuration: item.audioDuration,
             ticks: "sent"
           });
+          playSound(SOUND_MY_AUDIO_SENT);
+
         } else if (item.type === "image" || item.type === "gif" || item.type === "sticker" || item.type === "video") {
           setCurrentTypingText(`Sending ${item.type}...`);
           setShowSendButton(true);
-          await delay(700); 
+          await delay(700);
 
           sentMessageId = addMessage({
             sender: "me",
@@ -178,6 +198,7 @@ export default function ChatterSimPage() {
             videoDuration: item.videoDuration,
             ticks: "sent"
           });
+          playSound(SOUND_MY_MESSAGE_SENT);
           setCurrentTypingText("");
           setShowSendButton(false);
         }
@@ -191,11 +212,13 @@ export default function ChatterSimPage() {
       } else { // sender is "friend"
         setShowKeypadInputArea(false);
         setShowFriendTypingIndicator(true);
+        playSound(SOUND_FRIEND_TYPING);
         await delay(FRIEND_TYPING_INDICATOR_DURATION_MS);
         setShowFriendTypingIndicator(false);
 
         if (item.type === "text") {
           addMessage({ sender: "friend", type: "text", content: item.content });
+          playSound(SOUND_FRIEND_MESSAGE_RECEIVED);
           const wordCount = item.content.split(/\s+/).length;
           const readingTimeMs = (wordCount / READING_WORDS_PER_MINUTE) * 60 * 1000;
           await delay(Math.max(readingTimeMs, 1000));
@@ -204,6 +227,7 @@ export default function ChatterSimPage() {
            if (!item.content) {
             console.warn("Friend's audio message has no content. Skipping playback wait.");
             addMessage({ sender: "friend", type: "audio", content: "", isPlaying: false, audioDuration: item.audioDuration });
+            playSound(SOUND_FRIEND_MESSAGE_RECEIVED);
             await delay(item.audioDuration || 1000);
           } else {
             const audioMessageId = addMessage({
@@ -213,6 +237,7 @@ export default function ChatterSimPage() {
               isPlaying: true,
               audioDuration: item.audioDuration
             });
+            playSound(SOUND_FRIEND_MESSAGE_RECEIVED);
             await new Promise<void>(resolve => {
                audioCompletionPromises.current[audioMessageId] = resolve;
             });
@@ -221,6 +246,7 @@ export default function ChatterSimPage() {
           if (!item.content) {
              console.warn("Friend's video message has no content. Skipping playback wait.");
              addMessage({ sender: "friend", type: "video", content: "", isVideoPlaying: false, videoDuration: item.videoDuration });
+             playSound(SOUND_FRIEND_MESSAGE_RECEIVED);
              await delay(item.videoDuration || 2000);
           } else {
             const videoMessageId = addMessage({
@@ -230,13 +256,15 @@ export default function ChatterSimPage() {
               isVideoPlaying: true,
               videoDuration: item.videoDuration
             });
+            playSound(SOUND_FRIEND_MESSAGE_RECEIVED);
             await new Promise<void>(resolve => {
                videoCompletionPromises.current[videoMessageId] = resolve;
             });
           }
         } else if (item.type === "image" || item.type === "gif" || item.type === "sticker") {
            addMessage({ sender: "friend", type: item.type, content: item.content });
-           await delay(1500); 
+           playSound(SOUND_FRIEND_MESSAGE_RECEIVED);
+           await delay(1500);
         }
       }
       await delay(item.delayAfter);
@@ -268,7 +296,7 @@ export default function ChatterSimPage() {
               <Label htmlFor="friendAvatarUrl">Friend's Avatar</Label>
               <div className="flex items-center gap-2">
                 {friendAvatarUrl ? (
-                    <Image src={friendAvatarUrl} alt="Friend Avatar Preview" width={40} height={40} className="rounded-full object-cover border" data-ai-hint="profile avatar" />
+                    <Image src={friendAvatarUrl} alt="Friend Avatar Preview" width={40} height={40} className="rounded-full object-cover border" data-ai-hint="profile avatar"/>
                   ) : (
                     <UserCircle className="h-10 w-10 text-muted-foreground" />
                   )}
@@ -276,7 +304,7 @@ export default function ChatterSimPage() {
                   id="friendAvatarUrl"
                   value={isAvatarUploaded ? "Using uploaded file" : friendAvatarUrl}
                   onChange={(e) => {
-                    if (avatarFileInputRef.current) avatarFileInputRef.current.value = ""; 
+                    if (avatarFileInputRef.current) avatarFileInputRef.current.value = "";
                     setFriendAvatarUrl(e.target.value);
                   }}
                   placeholder="Enter avatar URL or upload"
@@ -344,3 +372,4 @@ export default function ChatterSimPage() {
     </div>
   );
 }
+

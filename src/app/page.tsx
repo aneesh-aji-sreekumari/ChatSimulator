@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, ChangeEvent } from "react";
 import type { Message, MessageQueueItem } from "@/types/chat";
 import { messageQueue as defaultMessageQueue } from "@/lib/sample-chat-data";
 import ChatHeader from "@/components/chat/ChatHeader";
@@ -9,10 +9,11 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import KeypadArea from "@/components/chat/KeypadArea";
 import MessageComposer from "@/components/composer/MessageComposer";
 import { Button } from "@/components/ui/button";
-import { PlayCircle } from "lucide-react";
+import { PlayCircle, UserCircle, FileUp, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import Image from "next/image";
 
 
 const TYPING_SPEED_MS = 80;
@@ -35,7 +36,7 @@ export default function ChatterSimPage() {
 
   const [friendName, setFriendName] = useState<string>("Alice");
   const [friendAvatarUrl, setFriendAvatarUrl] = useState<string>("https://placehold.co/80x80.png");
-
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
   const audioCompletionPromises = useRef<Record<string, () => void>>({});
   const videoCompletionPromises = useRef<Record<string, () => void>>({});
@@ -66,6 +67,26 @@ export default function ChatterSimPage() {
     videoCompletionPromises.current[messageId]?.();
     delete videoCompletionPromises.current[messageId];
   }, []);
+
+  const handleAvatarFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFriendAvatarUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearUploadedAvatar = () => {
+    setFriendAvatarUrl("https://placehold.co/80x80.png"); 
+    if (avatarFileInputRef.current) {
+      avatarFileInputRef.current.value = "";
+    }
+  };
+
+  const isAvatarUploaded = friendAvatarUrl.startsWith("data:image");
 
 
   const simulateChat = async (queue: MessageQueueItem[]) => {
@@ -115,17 +136,25 @@ export default function ChatterSimPage() {
           if (item.content) {
             const audio = new Audio(item.content);
             const playbackPromise = new Promise<void>((resolve, reject) => {
-              audio.oncanplaythrough = () => audio.play().catch(err => { console.error("Error playing recording sim audio:", err); reject(err); });
-              audio.onended = resolve;
-              audio.onerror = (e) => { console.error("Error during recording sim audio playback:", e); reject(e); };
-              audio.load();
+                audio.oncanplaythrough = () => audio.play().catch(err => {
+                    console.error("Error playing recording sim audio:", err);
+                    // Attempt to resolve anyway to not block simulation, or reject if critical
+                    resolve(); // Or reject(err) if this failure should stop the simulation
+                });
+                audio.onended = resolve;
+                audio.onerror = (e) => {
+                    console.error("Error during recording sim audio playback:", e);
+                    // Attempt to resolve anyway
+                    resolve(); // Or reject(e)
+                };
+                audio.load(); // Ensure audio loads
             });
-             try {
+            try {
                 await playbackPromise;
-             } catch (error) {
-                console.error("Failed to play audio during 'me' sending simulation:", error);
+            } catch (error) {
+                console.error("Failed to play audio during 'me' sending simulation, falling back to duration:", error);
                 await delay(item.audioDuration || 2000);
-             }
+            }
           } else {
             await delay(item.audioDuration || 2000);
           }
@@ -140,7 +169,7 @@ export default function ChatterSimPage() {
         } else if (item.type === "image" || item.type === "gif" || item.type === "sticker" || item.type === "video") {
           setCurrentTypingText(`Sending ${item.type}...`);
           setShowSendButton(true);
-          await delay(700);
+          await delay(700); 
 
           sentMessageId = addMessage({
             sender: "me",
@@ -201,13 +230,13 @@ export default function ChatterSimPage() {
               isVideoPlaying: true,
               videoDuration: item.videoDuration
             });
-             await new Promise<void>(resolve => {
+            await new Promise<void>(resolve => {
                videoCompletionPromises.current[videoMessageId] = resolve;
             });
           }
         } else if (item.type === "image" || item.type === "gif" || item.type === "sticker") {
            addMessage({ sender: "friend", type: item.type, content: item.content });
-           await delay(1500);
+           await delay(1500); 
         }
       }
       await delay(item.delayAfter);
@@ -235,15 +264,46 @@ export default function ChatterSimPage() {
                 className="mt-1"
               />
             </div>
-            <div>
-              <Label htmlFor="friendAvatarUrl">Friend's Avatar URL</Label>
-              <Input
-                id="friendAvatarUrl"
-                value={friendAvatarUrl}
-                onChange={(e) => setFriendAvatarUrl(e.target.value)}
-                placeholder="Enter avatar URL (e.g., https://placehold.co/80x80.png)"
-                className="mt-1"
-              />
+            <div className="space-y-2">
+              <Label htmlFor="friendAvatarUrl">Friend's Avatar</Label>
+              <div className="flex items-center gap-2">
+                {friendAvatarUrl ? (
+                    <Image src={friendAvatarUrl} alt="Friend Avatar Preview" width={40} height={40} className="rounded-full object-cover border" data-ai-hint="profile avatar" />
+                  ) : (
+                    <UserCircle className="h-10 w-10 text-muted-foreground" />
+                  )}
+                <Input
+                  id="friendAvatarUrl"
+                  value={isAvatarUploaded ? "Using uploaded file" : friendAvatarUrl}
+                  onChange={(e) => {
+                    if (avatarFileInputRef.current) avatarFileInputRef.current.value = ""; 
+                    setFriendAvatarUrl(e.target.value);
+                  }}
+                  placeholder="Enter avatar URL or upload"
+                  className="mt-1 flex-grow"
+                  disabled={isAvatarUploaded}
+                />
+              </div>
+              <div className="text-sm text-muted-foreground text-center my-1">OR</div>
+              <div className="flex gap-2 items-center">
+                <Label htmlFor="avatar-file-input" className={`w-full inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 ${isAvatarUploaded ? 'bg-secondary/50 cursor-not-allowed' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer'}`}>
+                  <FileUp className="mr-2 h-4 w-4" /> Upload Avatar
+                </Label>
+                <Input
+                  id="avatar-file-input"
+                  ref={avatarFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarFileChange}
+                  className="hidden"
+                  disabled={isAvatarUploaded}
+                />
+                 {isAvatarUploaded && (
+                  <Button variant="outline" size="iconSm" onClick={clearUploadedAvatar} aria-label="Clear uploaded avatar">
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -252,7 +312,7 @@ export default function ChatterSimPage() {
 
       <div className="md:w-2/3 lg:w-3/4 flex flex-col items-center justify-center">
         <div className="w-full max-w-sm h-[calc(100vh-2rem-env(safe-area-inset-bottom))] sm:h-[calc(100vh-4rem-env(safe-area-inset-bottom))] max-h-[800px] bg-background flex flex-col shadow-2xl rounded-xl overflow-hidden border-4 border-slate-700 dark:border-slate-600">
-          <ChatHeader name={friendName} avatarUrl={friendAvatarUrl} isOnline={isSimulating || showFriendTypingIndicator} />
+          <ChatHeader name={friendName} avatarUrl={friendAvatarUrl || undefined} isOnline={isSimulating || showFriendTypingIndicator} />
           <ChatWindow
             messages={messages}
             showTypingIndicator={showFriendTypingIndicator}

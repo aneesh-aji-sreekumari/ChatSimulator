@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { MessageSender } from "@/types/chat";
@@ -11,9 +12,10 @@ interface AudioPlayerProps {
   sender: MessageSender;
   onPlaybackEnd?: () => void;
   initialDuration?: number; // Duration in ms
+  friendAvatarUrlForAudio?: string;
 }
 
-export default function AudioPlayer({ audioUrl, autoPlay = false, sender, onPlaybackEnd, initialDuration }: AudioPlayerProps) {
+export default function AudioPlayer({ audioUrl, autoPlay = false, sender, onPlaybackEnd, initialDuration, friendAvatarUrlForAudio }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [progress, setProgress] = useState(0);
@@ -40,7 +42,7 @@ export default function AudioPlayer({ audioUrl, autoPlay = false, sender, onPlay
       setProgress(100);
       onPlaybackEnd?.();
     };
-    
+
     audio.addEventListener("loadeddata", setAudioData);
     audio.addEventListener("durationchange", setAudioData); // Handles cases where duration becomes available later
     audio.addEventListener("timeupdate", setAudioTime);
@@ -49,10 +51,9 @@ export default function AudioPlayer({ audioUrl, autoPlay = false, sender, onPlay
     if (autoPlay) {
       audio.play().catch(error => console.warn("Autoplay prevented:", error));
     }
-    
-    // Preload metadata to get duration if not provided
+
     if (!initialDuration && audio.preload !== 'none') {
-       audio.load(); // This should trigger loadeddata or durationchange
+       audio.load();
     }
 
 
@@ -107,9 +108,8 @@ export default function AudioPlayer({ audioUrl, autoPlay = false, sender, onPlay
         </div>
       </div>
        <span className="text-xs w-10 text-right">{formatTime(duration * (progress / 100))}</span>
-       {/* Placeholder for profile pic on audio for friend */}
-       {sender === 'friend' && (
-        <Image src="https://placehold.co/24x24.png" alt="sender avatar" width={24} height={24} className="rounded-full" data-ai-hint="profile avatar" />
+       {sender === 'friend' && friendAvatarUrlForAudio && (
+        <Image src={friendAvatarUrlForAudio} alt="friend avatar" width={24} height={24} className="rounded-full" data-ai-hint="profile avatar" />
        )}
     </div>
   );

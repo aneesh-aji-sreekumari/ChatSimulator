@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Message } from "@/types/chat";
@@ -11,9 +12,10 @@ interface ChatWindowProps {
   showTypingIndicator: boolean;
   onAudioPlaybackEnd?: (messageId: string) => void;
   onVideoPlaybackEnd?: (messageId: string) => void;
+  friendAvatarUrl: string;
 }
 
-export default function ChatWindow({ messages, showTypingIndicator, onAudioPlaybackEnd, onVideoPlaybackEnd }: ChatWindowProps) {
+export default function ChatWindow({ messages, showTypingIndicator, onAudioPlaybackEnd, onVideoPlaybackEnd, friendAvatarUrl }: ChatWindowProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,11 +31,12 @@ export default function ChatWindow({ messages, showTypingIndicator, onAudioPlayb
     <ScrollArea className="flex-grow p-4 bg-whatsapp-bg" ref={scrollAreaRef}>
       <div className="flex flex-col space-y-2" aria-live="polite">
         {messages.map((msg) => (
-          <MessageBubble 
-            key={msg.id} 
-            message={msg} 
+          <MessageBubble
+            key={msg.id}
+            message={msg}
             onAudioPlaybackEnd={onAudioPlaybackEnd}
             onVideoPlaybackEnd={onVideoPlaybackEnd}
+            friendAvatarUrl={friendAvatarUrl}
           />
         ))}
         {showTypingIndicator && <TypingIndicator />}

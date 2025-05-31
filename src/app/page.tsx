@@ -10,8 +10,12 @@ import KeypadArea from "@/components/chat/KeypadArea";
 import MessageComposer from "@/components/composer/MessageComposer";
 import { Button } from "@/components/ui/button";
 import { PlayCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
-const TYPING_SPEED_MS = 80; 
+
+const TYPING_SPEED_MS = 80;
 const FRIEND_TYPING_INDICATOR_DURATION_MS = 1500;
 const READING_WORDS_PER_MINUTE = 200;
 
@@ -20,16 +24,17 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export default function ChatterSimPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [currentTypingText, setCurrentTypingText] = useState(""); 
+  const [currentTypingText, setCurrentTypingText] = useState("");
   const [showFriendTypingIndicator, setShowFriendTypingIndicator] = useState(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
-  const [showKeypadInputArea, setShowKeypadInputArea] = useState(false); 
+  const [showKeypadInputArea, setShowKeypadInputArea] = useState(false);
   const [showSendButton, setShowSendButton] = useState(false);
   const [customMessageQueue, setCustomMessageQueue] = useState<MessageQueueItem[]>(() => {
-    // Ensure defaultMessageQueue items have IDs if they are to be editable by composer
-    // This is now handled in sample-chat-data.ts
     return JSON.parse(JSON.stringify(defaultMessageQueue)); // Deep copy
   });
+
+  const [friendName, setFriendName] = useState<string>("Alice");
+  const [friendAvatarUrl, setFriendAvatarUrl] = useState<string>("https://placehold.co/80x80.png");
 
 
   const audioCompletionPromises = useRef<Record<string, () => void>>({});
@@ -37,10 +42,10 @@ export default function ChatterSimPage() {
 
 
   const addMessage = (newMessageOmitIdTimestamp: Omit<Message, "id" | "timestamp">) => {
-    const newMessage = { 
-      ...newMessageOmitIdTimestamp, 
-      id: Date.now().toString() + Math.random(), 
-      timestamp: new Date() 
+    const newMessage = {
+      ...newMessageOmitIdTimestamp,
+      id: Date.now().toString() + Math.random(),
+      timestamp: new Date()
     };
     setMessages(prev => [...prev, newMessage]);
     return newMessage.id;
@@ -66,8 +71,6 @@ export default function ChatterSimPage() {
   const simulateChat = async (queue: MessageQueueItem[]) => {
     if (!queue || queue.length === 0) {
       console.warn("Message queue is empty. Nothing to simulate.");
-      // Optionally, show a toast or message to the user
-      // For now, just return
       return;
     }
     setIsSimulating(true);
@@ -75,14 +78,14 @@ export default function ChatterSimPage() {
     setCurrentTypingText("");
     setIsRecordingAudio(false);
     setShowFriendTypingIndicator(false);
-    setMessages([]); 
+    setMessages([]);
 
-    await delay(500); 
+    await delay(500);
 
     for (const item of queue) {
       if (item.sender === "me") {
         setShowKeypadInputArea(true);
-        await delay(300); 
+        await delay(300);
 
         let sentMessageId: string | undefined;
 
@@ -93,8 +96,8 @@ export default function ChatterSimPage() {
             await delay(TYPING_SPEED_MS);
           }
           setShowSendButton(true);
-          await delay(500); 
-          
+          await delay(500);
+
           sentMessageId = addMessage({
             sender: "me",
             type: "text",
@@ -106,22 +109,21 @@ export default function ChatterSimPage() {
 
         } else if (item.type === "audio") {
           setIsRecordingAudio(true);
-          setCurrentTypingText(""); 
+          setCurrentTypingText("");
           setShowSendButton(false);
-          
+
           if (item.content) {
             const audio = new Audio(item.content);
             const playbackPromise = new Promise<void>((resolve, reject) => {
               audio.oncanplaythrough = () => audio.play().catch(err => { console.error("Error playing recording sim audio:", err); reject(err); });
               audio.onended = resolve;
               audio.onerror = (e) => { console.error("Error during recording sim audio playback:", e); reject(e); };
-              audio.load(); 
+              audio.load();
             });
              try {
                 await playbackPromise;
              } catch (error) {
                 console.error("Failed to play audio during 'me' sending simulation:", error);
-                // Fallback to duration if playback fails
                 await delay(item.audioDuration || 2000);
              }
           } else {
@@ -137,22 +139,22 @@ export default function ChatterSimPage() {
           });
         } else if (item.type === "image" || item.type === "gif" || item.type === "sticker" || item.type === "video") {
           setCurrentTypingText(`Sending ${item.type}...`);
-          setShowSendButton(true); 
-          await delay(700); 
+          setShowSendButton(true);
+          await delay(700);
 
           sentMessageId = addMessage({
             sender: "me",
             type: item.type,
             content: item.content,
-            videoDuration: item.videoDuration, // only relevant for video type
+            videoDuration: item.videoDuration,
             ticks: "sent"
           });
           setCurrentTypingText("");
           setShowSendButton(false);
         }
-        
+
         if (sentMessageId) {
-          await delay(300); 
+          await delay(300);
           updateMessageTicks(sentMessageId, "delivered");
         }
         setShowKeypadInputArea(false);
@@ -167,20 +169,20 @@ export default function ChatterSimPage() {
           addMessage({ sender: "friend", type: "text", content: item.content });
           const wordCount = item.content.split(/\s+/).length;
           const readingTimeMs = (wordCount / READING_WORDS_PER_MINUTE) * 60 * 1000;
-          await delay(Math.max(readingTimeMs, 1000)); 
+          await delay(Math.max(readingTimeMs, 1000));
 
         } else if (item.type === "audio") {
            if (!item.content) {
             console.warn("Friend's audio message has no content. Skipping playback wait.");
             addMessage({ sender: "friend", type: "audio", content: "", isPlaying: false, audioDuration: item.audioDuration });
-            await delay(item.audioDuration || 1000); // Fallback delay
+            await delay(item.audioDuration || 1000);
           } else {
             const audioMessageId = addMessage({
               sender: "friend",
               type: "audio",
               content: item.content,
-              isPlaying: true, 
-              audioDuration: item.audioDuration 
+              isPlaying: true,
+              audioDuration: item.audioDuration
             });
             await new Promise<void>(resolve => {
                audioCompletionPromises.current[audioMessageId] = resolve;
@@ -190,7 +192,7 @@ export default function ChatterSimPage() {
           if (!item.content) {
              console.warn("Friend's video message has no content. Skipping playback wait.");
              addMessage({ sender: "friend", type: "video", content: "", isVideoPlaying: false, videoDuration: item.videoDuration });
-             await delay(item.videoDuration || 2000); // Fallback delay
+             await delay(item.videoDuration || 2000);
           } else {
             const videoMessageId = addMessage({
               sender: "friend",
@@ -205,7 +207,7 @@ export default function ChatterSimPage() {
           }
         } else if (item.type === "image" || item.type === "gif" || item.type === "sticker") {
            addMessage({ sender: "friend", type: item.type, content: item.content });
-           await delay(1500); 
+           await delay(1500);
         }
       }
       await delay(item.delayAfter);
@@ -217,18 +219,46 @@ export default function ChatterSimPage() {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-200 dark:bg-slate-800 p-4 gap-4">
-      <div className="md:w-1/3 lg:w-1/4 h-full md:max-h-[calc(100vh-2rem)]">
+      <div className="md:w-1/3 lg:w-1/4 h-full md:max-h-[calc(100vh-2rem)] flex flex-col gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Customize Friend</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="friendName">Friend's Name</Label>
+              <Input
+                id="friendName"
+                value={friendName}
+                onChange={(e) => setFriendName(e.target.value)}
+                placeholder="Enter friend's name"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="friendAvatarUrl">Friend's Avatar URL</Label>
+              <Input
+                id="friendAvatarUrl"
+                value={friendAvatarUrl}
+                onChange={(e) => setFriendAvatarUrl(e.target.value)}
+                placeholder="Enter avatar URL (e.g., https://placehold.co/80x80.png)"
+                className="mt-1"
+              />
+            </div>
+          </CardContent>
+        </Card>
         <MessageComposer queue={customMessageQueue} setQueue={setCustomMessageQueue} />
       </div>
-      
+
       <div className="md:w-2/3 lg:w-3/4 flex flex-col items-center justify-center">
         <div className="w-full max-w-sm h-[calc(100vh-2rem-env(safe-area-inset-bottom))] sm:h-[calc(100vh-4rem-env(safe-area-inset-bottom))] max-h-[800px] bg-background flex flex-col shadow-2xl rounded-xl overflow-hidden border-4 border-slate-700 dark:border-slate-600">
-          <ChatHeader name="Alice" avatarUrl="https://placehold.co/80x80.png" isOnline={isSimulating || showFriendTypingIndicator} />
-          <ChatWindow 
-            messages={messages} 
-            showTypingIndicator={showFriendTypingIndicator} 
+          <ChatHeader name={friendName} avatarUrl={friendAvatarUrl} isOnline={isSimulating || showFriendTypingIndicator} />
+          <ChatWindow
+            messages={messages}
+            showTypingIndicator={showFriendTypingIndicator}
             onAudioPlaybackEnd={handleAudioPlaybackEnd}
-            onVideoPlaybackEnd={handleVideoPlaybackEnd} 
+            onVideoPlaybackEnd={handleVideoPlaybackEnd}
+            friendAvatarUrl={friendAvatarUrl}
           />
           {(showKeypadInputArea || isRecordingAudio) && (
             <KeypadArea

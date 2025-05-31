@@ -10,9 +10,10 @@ interface ChatWindowProps {
   messages: Message[];
   showTypingIndicator: boolean;
   onAudioPlaybackEnd?: (messageId: string) => void;
+  onVideoPlaybackEnd?: (messageId: string) => void;
 }
 
-export default function ChatWindow({ messages, showTypingIndicator, onAudioPlaybackEnd }: ChatWindowProps) {
+export default function ChatWindow({ messages, showTypingIndicator, onAudioPlaybackEnd, onVideoPlaybackEnd }: ChatWindowProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,7 +29,12 @@ export default function ChatWindow({ messages, showTypingIndicator, onAudioPlayb
     <ScrollArea className="flex-grow p-4 bg-whatsapp-bg" ref={scrollAreaRef}>
       <div className="flex flex-col space-y-2" aria-live="polite">
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} onAudioPlaybackEnd={onAudioPlaybackEnd} />
+          <MessageBubble 
+            key={msg.id} 
+            message={msg} 
+            onAudioPlaybackEnd={onAudioPlaybackEnd}
+            onVideoPlaybackEnd={onVideoPlaybackEnd}
+          />
         ))}
         {showTypingIndicator && <TypingIndicator />}
       </div>

@@ -2,7 +2,7 @@
 "use client";
 
 import type { MessageQueueItem, MessageSender, MessageType } from "@/types/chat";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,10 +19,11 @@ interface MessageComposerProps {
 
 const initialFormState: Omit<MessageQueueItem, "id"> = {
   sender: "me",
-  type: "text" as MessageType, // Cast because form limited to text/audio but type is broader
+  type: "text" as MessageType,
   content: "",
   delayAfter: 1000,
   audioDuration: undefined,
+  videoDuration: undefined,
 };
 
 export default function MessageComposer({ queue, setQueue }: MessageComposerProps) {
@@ -31,7 +32,12 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === "delayAfter" || name === "audioDuration" ? parseInt(value, 10) || 0 : value }));
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: (name === "delayAfter" || name === "audioDuration" || name === "videoDuration") 
+                ? parseInt(value, 10) || 0 
+                : value 
+    }));
   };
 
   const handleSelectChange = (name: "sender" | "type") => (value: string) => {
@@ -39,8 +45,9 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
     setFormData(prev => ({
       ...prev,
       [name]: value,
-      // Reset audioDuration if type is not audio
       audioDuration: newType === "audio" ? prev.audioDuration || 2000 : undefined,
+      videoDuration: newType === "video" ? prev.videoDuration || 5000 : undefined,
+      content: newType !== "text" && prev.type === "text" ? "" : prev.content, // Clear content if switching from text to media
     }));
   };
 
@@ -56,15 +63,13 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
   };
 
   const handleEdit = (messageToEdit: MessageQueueItem) => {
-    // If type is not text or audio, default to text for the form
-    const formCompatibleType = (messageToEdit.type === "text" || messageToEdit.type === "audio") ? messageToEdit.type : "text";
-    
     setFormData({
       sender: messageToEdit.sender,
-      type: formCompatibleType,
+      type: messageToEdit.type,
       content: messageToEdit.content,
       delayAfter: messageToEdit.delayAfter,
-      audioDuration: formCompatibleType === "audio" ? messageToEdit.audioDuration || 2000 : undefined,
+      audioDuration: messageToEdit.type === "audio" ? messageToEdit.audioDuration : undefined,
+      videoDuration: messageToEdit.type === "video" ? messageToEdit.videoDuration : undefined,
     });
     setEditingId(messageToEdit.id);
   };
@@ -116,6 +121,10 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
               <SelectContent>
                 <SelectItem value="text">Text</SelectItem>
                 <SelectItem value="audio">Audio</SelectItem>
+                <SelectItem value="image">Image</SelectItem>
+                <SelectItem value="gif">GIF</SelectItem>
+                <SelectItem value="sticker">Sticker</SelectItem>
+                <SelectItem value="video">Video</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -125,7 +134,7 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
             {formData.type === "text" ? (
               <Textarea id="content" name="content" value={formData.content} onChange={handleInputChange} placeholder="Enter message text..." />
             ) : (
-              <Input id="content" name="content" value={formData.content} onChange={handleInputChange} placeholder="Enter audio URL..." />
+              <Input id="content" name="content" value={formData.content} onChange={handleInputChange} placeholder={`Enter ${formData.type} URL...`} />
             )}
           </div>
 
@@ -133,6 +142,13 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
             <div>
               <Label htmlFor="audioDuration">Audio Duration (ms)</Label>
               <Input id="audioDuration" name="audioDuration" type="number" value={formData.audioDuration || ""} onChange={handleInputChange} placeholder="e.g., 2000" />
+            </div>
+          )}
+
+          {formData.type === "video" && (
+            <div>
+              <Label htmlFor="videoDuration">Video Duration (ms)</Label>
+              <Input id="videoDuration" name="videoDuration" type="number" value={formData.videoDuration || ""} onChange={handleInputChange} placeholder="e.g., 5000" />
             </div>
           )}
 
@@ -178,13 +194,13 @@ export default function MessageComposer({ queue, setQueue }: MessageComposerProp
                           </span>
                           <span className="capitalize text-muted-foreground">({item.type})</span>
                         </p>
-                        <p className="text-sm mt-1 break-all">
-                          {item.content.length > 50 ? `${item.content.substring(0, 50)}...` : item.content}
+                        <p className="text-sm mt-1 break-all max-w-[200px] sm:max-w-[250px] md:max-w-[200px] lg:max-w-[250px] xl:max-w-xs truncate">
+                          {item.content}
                         </p>
                         <div className="text-xs text-muted-foreground mt-1">
                           <span>Delay: {item.delayAfter}ms</span>
                           {item.type === 'audio' && item.audioDuration && <span> / Duration: {item.audioDuration}ms</span>}
-                           {item.type === 'video' && item.videoDuration && <span> / Duration: {item.videoDuration}ms</span>}
+                          {item.type === 'video' && item.videoDuration && <span> / Duration: {item.videoDuration}ms</span>}
                         </div>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2 ml-2">

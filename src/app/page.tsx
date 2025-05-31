@@ -88,17 +88,50 @@ export default function ChatterSimPage() {
 
         } else if (item.type === "audio") {
           setIsRecordingAudio(true);
-          setCurrentTypingText(""); // Clear any text
+          setCurrentTypingText(""); 
           setShowSendButton(false);
-          await delay(item.audioDuration || 2000); // Simulate recording duration
+          
+          if (item.content) {
+            await new Promise<void>((resolve, reject) => {
+              const audio = new Audio(item.content);
+              audio.oncanplaythrough = () => {
+                audio.play().catch(err => {
+                  console.error("Error playing recording simulation audio:", err);
+                  resolve(); // Resolve even if play fails to continue simulation
+                });
+              };
+              audio.onended = () => {
+                resolve();
+              };
+              audio.onerror = (e) => {
+                console.error("Error during recording simulation audio playback:", e);
+                resolve(); // Resolve to continue simulation despite error
+              };
+              // Ensure audio loads, especially if not preloaded elsewhere
+              audio.load();
+            });
+          } else {
+            // Fallback if no audio content, though ideally item.content should always be there for audio type
+            await delay(item.audioDuration || 2000);
+          }
+
           setIsRecordingAudio(false);
-          addMessage({
-            sender: "me",
-            type: "audio",
-            content: item.content,
-            ticks: "delivered", // Directly to delivered for simplicity
-            audioDuration: item.audioDuration,
-          });
+
+          const sentMessageId = Date.now().toString() + Math.random();
+          setMessages(prev => [
+            ...prev,
+            {
+              id: sentMessageId,
+              sender: "me",
+              type: "audio",
+              content: item.content,
+              timestamp: new Date(),
+              ticks: "sent",
+              audioDuration: item.audioDuration,
+            },
+          ]);
+          await delay(300); 
+          updateMessageTicks(sentMessageId, "delivered");
         }
         setShowKeypadInputArea(false);
 
@@ -112,7 +145,7 @@ export default function ChatterSimPage() {
 
           const wordCount = item.content.split(/\s+/).length;
           const readingTimeMs = (wordCount / READING_WORDS_PER_MINUTE) * 60 * 1000;
-          await delay(Math.max(readingTimeMs, 1000)); // Minimum 1s reading time
+          await delay(Math.max(readingTimeMs, 1000)); 
 
         } else if (item.type === "audio") {
           const audioMessageId = Date.now().toString() + Math.random();
@@ -124,17 +157,14 @@ export default function ChatterSimPage() {
               type: "audio",
               content: item.content,
               timestamp: new Date(),
-              isPlaying: true, // This will trigger autoPlay in AudioPlayer
-              audioDuration: item.audioDuration // For UI hints
+              isPlaying: true, 
+              audioDuration: item.audioDuration 
             },
           ]);
-
-          // Wait for the audio to actually finish playing.
-          // The promise is resolved by handleAudioPlaybackEnd when the AudioPlayer's 'ended' event fires.
+          
+          // Wait for this specific audio message to finish playing
           await new Promise<void>(resolve => {
-            audioCompletionPromises.current[audioMessageId] = resolve;
-            // The promise will resolve when handleAudioPlaybackEnd is called.
-            // No explicit timeout based on item.audioDuration here.
+             audioCompletionPromises.current[audioMessageId] = resolve;
           });
         }
       }
